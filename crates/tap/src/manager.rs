@@ -1,7 +1,7 @@
 //! Tap manager for handling multiple taps
 
 use crate::{parse_tap_name, Tap, TapError};
-use anyhow::{Context, Result};
+use anyhow::Result;
 use brew_config::Paths;
 use brew_formula::Formula;
 use std::collections::HashMap;

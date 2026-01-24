@@ -3,7 +3,7 @@
 use anyhow::{Context, Result};
 use brew_formula::Formula;
 use git2::Repository;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use tracing::{debug, info};
 
 /// A single tap repository
