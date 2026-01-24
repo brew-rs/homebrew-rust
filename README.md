@@ -2,7 +2,7 @@
 
 > A blazing-fast, production-ready package manager written in Rust
 
-[![CI](https://github.com/Serendeep/homebrew-rust/workflows/CI/badge.svg)](https://github.com/Serendeep/homebrew-rust/actions)
+[![CI](https://github.com/brew-rs/homebrew-rust/workflows/CI/badge.svg)](https://github.com/brew-rs/homebrew-rust/actions)
 [![License](https://img.shields.io/badge/license-blue.svg)](LICENSE)
 
 ## Vision
@@ -79,7 +79,7 @@ brew-rs solves these problems with:
 ### From Source
 
 ```bash
-git clone https://github.com/Serendeep/homebrew-rust.git
+git clone https://github.com/brew-rs/homebrew-rust.git
 cd homebrew-rust
 cargo build --release
 sudo cp target/release/brew-rs /usr/local/bin/
