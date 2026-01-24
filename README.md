@@ -88,7 +88,7 @@ sudo cp target/release/brew-rs /usr/local/bin/
 ### From Binary (Coming Soon)
 
 ```bash
-curl -fsSL https://brew-rs.dev/install.sh | sh
+curl -fsSL https://brew-rs.serendeep.tech/install.sh | sh
 ```
 
 ## Quick Start
@@ -252,7 +252,7 @@ Security is a top priority. brew-rs implements:
 - 🚧 CVE scanning
 - 🚧 Sandboxed builds
 
-To report security vulnerabilities, please email security@brew-rs.dev (do not use public issues).
+To report security vulnerabilities, please email serendeep10@gmail.com (do not use public issues).
 
 ## License
 
