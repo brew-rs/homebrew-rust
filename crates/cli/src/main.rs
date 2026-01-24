@@ -17,6 +17,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Initialize brew-rs directories and configuration
+    Init,
     /// Install a package
     Install {
         /// Package name to install
@@ -62,6 +64,47 @@ async fn main() -> Result<()> {
     info!("brew-rs v{}", env!("CARGO_PKG_VERSION"));
 
     match cli.command {
+        Commands::Init => {
+            info!("Initializing brew-rs");
+            match brew_config::Config::load() {
+                Ok(config) => {
+                    match config.init_directories() {
+                        Ok(_) => {
+                            println!("✓ Initialized brew-rs directories:");
+                            println!("  Data:    {}", config.paths.data_dir.display());
+                            println!("  Config:  {}", config.paths.config_dir.display());
+                            println!("  Cache:   {}", config.paths.cache_dir.display());
+                            println!("  Cellar:  {}", config.paths.cellar_dir.display());
+                            println!("  Bin:     {}", config.paths.bin_dir.display());
+
+                            // Save default config if it doesn't exist
+                            if !config.paths.config_file.exists() {
+                                if let Err(e) = config.save() {
+                                    println!("⚠ Warning: Could not save config: {}", e);
+                                } else {
+                                    println!("  Config file created: {}", config.paths.config_file.display());
+                                }
+                            }
+
+                            // Check if bin directory is in PATH
+                            if !config.paths.is_bin_in_path() {
+                                println!("\n⚠ Warning: {} is not in your PATH", config.paths.bin_dir.display());
+                                println!("Add this to your shell rc file (~/.zshrc or ~/.bashrc):");
+                                println!("  export PATH=\"{}:$PATH\"", config.paths.bin_dir.display());
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("Error initializing directories: {}", e);
+                            std::process::exit(1);
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error loading configuration: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
         Commands::Install { package } => {
             info!("Installing package: {}", package);
             // TODO: Implement installation logic

@@ -14,6 +14,7 @@ path = "src/main.rs"
 
 [dependencies]
 # Workspace crates
+brew-config = { path = "../config" }
 brew-core = { path = "../core" }
 brew-solver = { path = "../solver" }
 brew-fetcher = { path = "../fetcher" }
