@@ -48,6 +48,29 @@ enum Commands {
         /// Specific package to upgrade (optional)
         package: Option<String>,
     },
+    /// Manage package taps (repositories)
+    Tap {
+        #[command(subcommand)]
+        command: TapCommands,
+    },
+}
+
+#[derive(Subcommand)]
+enum TapCommands {
+    /// Add a new tap
+    Add {
+        /// Tap name (e.g., brew-rs/core)
+        name: String,
+        /// Git repository URL
+        url: String,
+    },
+    /// Update taps
+    Update {
+        /// Specific tap to update (updates all if not specified)
+        name: Option<String>,
+    },
+    /// List installed taps
+    List,
 }
 
 #[tokio::main]
@@ -137,6 +160,63 @@ async fn main() -> Result<()> {
             } else {
                 info!("Upgrading all packages");
                 println!("⬆️  Upgrading all packages (not yet implemented)");
+            }
+        }
+        Commands::Tap { command } => {
+            match command {
+                TapCommands::Add { name, url } => {
+                    info!("Adding tap: {} from {}", name, url);
+                    match brew_config::Config::load() {
+                        Ok(config) => {
+                            let mut manager = brew_tap::TapManager::new(config.paths);
+                            match manager.add_tap(&name, &url) {
+                                Ok(_) => {
+                                    println!("✓ Added tap: {}", name);
+                                    println!("  URL: {}", url);
+                                }
+                                Err(e) => {
+                                    eprintln!("Error adding tap: {}", e);
+                                    std::process::exit(1);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("Error loading configuration: {}", e);
+                            std::process::exit(1);
+                        }
+                    }
+                }
+                TapCommands::Update { name } => {
+                    match brew_config::Config::load() {
+                        Ok(config) => {
+                            let _manager = brew_tap::TapManager::new(config.paths);
+                            // For now, just show a message - we need to persist taps
+                            if let Some(tap_name) = name {
+                                info!("Updating tap: {}", tap_name);
+                                println!("🔄 Updating tap {} (tap persistence not yet implemented)", tap_name);
+                            } else {
+                                info!("Updating all taps");
+                                println!("🔄 Updating all taps (tap persistence not yet implemented)");
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("Error loading configuration: {}", e);
+                            std::process::exit(1);
+                        }
+                    }
+                }
+                TapCommands::List => {
+                    match brew_config::Config::load() {
+                        Ok(config) => {
+                            let _manager = brew_tap::TapManager::new(config.paths);
+                            println!("📋 Installed taps (tap persistence not yet implemented)");
+                        }
+                        Err(e) => {
+                            eprintln!("Error loading configuration: {}", e);
+                            std::process::exit(1);
+                        }
+                    }
+                }
             }
         }
     }

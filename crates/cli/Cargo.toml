@@ -19,6 +19,7 @@ brew-core = { path = "../core" }
 brew-solver = { path = "../solver" }
 brew-fetcher = { path = "../fetcher" }
 brew-formula = { path = "../formula" }
+brew-tap = { path = "../tap" }
 
 # External dependencies
 clap.workspace = true

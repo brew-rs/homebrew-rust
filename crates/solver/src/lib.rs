@@ -32,7 +32,7 @@ impl Resolver {
 
     /// Add a formula to the resolver
     pub fn add_formula(&mut self, formula: Formula) {
-        self.formulas.insert(formula.name.clone(), formula);
+        self.formulas.insert(formula.package.name.clone(), formula);
     }
 }
 
