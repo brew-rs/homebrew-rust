@@ -150,3 +150,31 @@ mod tests {
         assert_eq!(manager.tap_names().len(), 0);
     }
 }
+
+#[cfg(test)]
+mod integration_tests {
+    use super::*;
+    
+    #[test]
+    #[ignore] // Run with: cargo test -- --ignored
+    fn test_load_real_tap() {
+        let paths = Paths::new().unwrap();
+        let mut manager = TapManager::new(paths);
+        
+        // Load the brew-rs/core tap (assumes it's been added)
+        if manager.load_tap("brew-rs/core", "https://github.com/brew-rs/core.git").is_ok() {
+            // Try to find curl
+            let formula = manager.find_formula("curl");
+            assert!(formula.is_ok(), "Should find curl formula");
+            
+            let formula = formula.unwrap();
+            assert_eq!(formula.package.name, "curl");
+            println!("Found curl version: {}", formula.package.version);
+            
+            // List all formulas
+            let formulas = manager.list_all_formulas().unwrap();
+            assert!(!formulas.is_empty(), "Should have formulas");
+            println!("Total formulas: {}", formulas.len());
+        }
+    }
+}
