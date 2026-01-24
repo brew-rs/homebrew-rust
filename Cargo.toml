@@ -1,0 +1,70 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/cli",
+    "crates/core",
+    "crates/solver",
+    "crates/fetcher",
+    "crates/formula",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+authors = ["Homebrew Rust Contributors"]
+license = "MIT"
+repository = "https://github.com/yourusername/homebrew-rust"
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1.35", features = ["full"] }
+tokio-util = "0.7"
+
+# HTTP client
+reqwest = { version = "0.11", features = ["stream", "rustls-tls"], default-features = false }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+
+# CLI
+clap = { version = "4.4", features = ["derive", "cargo"] }
+indicatif = "0.17"
+console = "0.15"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Compression
+flate2 = "1.0"
+tar = "0.4"
+zip = "0.6"
+
+# Cryptography
+sha2 = "0.10"
+ring = "0.17"
+
+# Database
+rusqlite = { version = "0.30", features = ["bundled"] }
+
+# Utilities
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+chrono = "0.4"
+semver = "1.0"
+
+# Testing
+proptest = "1.4"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+opt-level = 3
+
+[profile.dev]
+opt-level = 0
+debug = true

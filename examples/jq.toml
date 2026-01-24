@@ -1,0 +1,24 @@
+# Example formula: jq
+# Lightweight and flexible command-line JSON processor
+
+[package]
+name = "jq"
+version = "1.7.1"
+description = "Lightweight and flexible command-line JSON processor"
+homepage = "https://jqlang.github.io/jq/"
+license = "MIT"
+
+[source]
+url = "https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-1.7.1.tar.gz"
+sha256 = "478c9ca129fd2e3443fe27314b455e211e0d8c60bc8ff7df703873deeee580c2"
+
+[dependencies]
+build = ["autoconf", "automake", "libtool"]
+
+[build]
+commands = [
+    "autoreconf -fi",
+    "./configure --prefix=$PREFIX --disable-maintainer-mode",
+    "make -j$NCPU",
+    "make install"
+]

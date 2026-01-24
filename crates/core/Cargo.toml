@@ -1,0 +1,28 @@
+[package]
+name = "brew-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Core package manager logic for brew-rs"
+
+[dependencies]
+brew-solver = { path = "../solver" }
+brew-fetcher = { path = "../fetcher" }
+brew-formula = { path = "../formula" }
+
+tokio.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+rusqlite.workspace = true
+tracing.workspace = true
+chrono.workspace = true
+sha2.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+tempfile = "3.8"

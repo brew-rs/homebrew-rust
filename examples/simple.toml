@@ -1,0 +1,17 @@
+# Example formula: simple
+# A minimal example showing the simplest possible formula
+
+[package]
+name = "simple"
+version = "1.0.0"
+description = "A simple example package with no dependencies"
+
+[source]
+url = "https://example.com/simple-1.0.0.tar.gz"
+sha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+[build]
+commands = [
+    "make",
+    "make install PREFIX=$PREFIX"
+]

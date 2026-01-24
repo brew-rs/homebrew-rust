@@ -1,0 +1,25 @@
+[package]
+name = "brew-solver"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "SAT-based dependency resolution for brew-rs"
+
+[dependencies]
+brew-formula = { path = "../formula" }
+
+anyhow.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+semver.workspace = true
+tracing.workspace = true
+
+# TODO: Evaluate libsolv bindings vs pure Rust SAT solver
+# Options: varisat, splr, or libsolv-sys
+# For now, we'll start with a simple implementation and upgrade later
+
+[dev-dependencies]
+proptest.workspace = true

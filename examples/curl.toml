@@ -1,0 +1,30 @@
+# Example formula: curl
+# A command-line tool for transferring data with URLs
+
+[package]
+name = "curl"
+version = "8.5.0"
+description = "Command-line tool for transferring data with URLs"
+homepage = "https://curl.se"
+license = "MIT"
+
+[source]
+url = "https://curl.se/download/curl-8.5.0.tar.gz"
+sha256 = "ce4b6a6655431147624aaf582632a36fe1ade262d5fab385c60f78942dd8d87b"
+mirrors = [
+    "https://github.com/curl/curl/releases/download/curl-8_5_0/curl-8.5.0.tar.gz"
+]
+
+[dependencies]
+runtime = ["openssl ^3.0", "zlib >=1.2.11", "libssh2"]
+build = ["pkg-config", "autoconf", "automake"]
+
+[build]
+commands = [
+    "./configure --prefix=$PREFIX --with-ssl --with-libssh2",
+    "make -j$NCPU",
+    "make install"
+]
+
+[build.env]
+PKG_CONFIG_PATH = "$PREFIX/lib/pkgconfig"

@@ -1,0 +1,21 @@
+[package]
+name = "brew-formula"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Package formula parsing and validation for brew-rs"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+semver.workspace = true
+url = "2.5"
+
+[dev-dependencies]
+proptest.workspace = true

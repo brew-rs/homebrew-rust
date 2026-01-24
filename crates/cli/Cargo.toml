@@ -1,0 +1,29 @@
+[package]
+name = "brew-rs"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "A blazing-fast package manager written in Rust"
+
+[[bin]]
+name = "brew-rs"
+path = "src/main.rs"
+
+[dependencies]
+# Workspace crates
+brew-core = { path = "../core" }
+brew-solver = { path = "../solver" }
+brew-fetcher = { path = "../fetcher" }
+brew-formula = { path = "../formula" }
+
+# External dependencies
+clap.workspace = true
+tokio.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+console.workspace = true
+indicatif.workspace = true

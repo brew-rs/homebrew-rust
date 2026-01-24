@@ -1,0 +1,23 @@
+[package]
+name = "brew-fetcher"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Parallel download engine for brew-rs"
+
+[dependencies]
+tokio.workspace = true
+tokio-util.workspace = true
+reqwest.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+sha2.workspace = true
+indicatif.workspace = true
+futures = "0.3"
+
+[dev-dependencies]
+mockito = "1.2"
