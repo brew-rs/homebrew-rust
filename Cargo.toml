@@ -7,6 +7,7 @@ members = [
     "crates/solver",
     "crates/fetcher",
     "crates/formula",
+    "crates/tap",
 ]
 
 [workspace.package]
