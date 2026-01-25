@@ -16,9 +16,14 @@ anyhow.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 serde.workspace = true
+toml.workspace = true
+chrono = { workspace = true, features = ["serde"] }
 
 # Git operations
 git2 = "0.18"
+
+# Database for formula cache
+rusqlite.workspace = true
 
 [dev-dependencies]
 tempfile = "3.8"
