@@ -23,6 +23,9 @@ enum Commands {
     Install {
         /// Package name to install
         package: String,
+        /// Show what would be installed without actually installing
+        #[arg(long)]
+        dry_run: bool,
     },
     /// Uninstall a package
     Uninstall {
@@ -63,6 +66,11 @@ enum TapCommands {
         name: String,
         /// Git repository URL
         url: String,
+    },
+    /// Remove a tap
+    Remove {
+        /// Tap name to remove
+        name: String,
     },
     /// Update taps
     Update {
@@ -128,10 +136,102 @@ async fn main() -> Result<()> {
                 }
             }
         }
-        Commands::Install { package } => {
+        Commands::Install { package, dry_run } => {
             info!("Installing package: {}", package);
-            // TODO: Implement installation logic
-            println!("📦 Installing {} (not yet implemented)", package);
+            match brew_config::Config::load() {
+                Ok(config) => {
+                    // Load tap manager to find formula
+                    match brew_tap::TapManager::new(config.paths.clone()) {
+                        Ok(tap_manager) => {
+                            // Find the formula
+                            match tap_manager.find_formula(&package) {
+                                Ok(formula) => {
+                                    // Create install queue
+                                    let mut queue = brew_solver::InstallQueue::new();
+
+                                    // Get installed packages
+                                    let installed = match brew_core::Database::open(&config.paths) {
+                                        Ok(db) => {
+                                            db.packages()
+                                                .list_all()
+                                                .unwrap_or_default()
+                                                .into_iter()
+                                                .map(|p| p.name)
+                                                .collect()
+                                        }
+                                        Err(_) => std::collections::HashSet::new(),
+                                    };
+                                    queue.set_installed(installed);
+
+                                    // Add root package
+                                    if let Err(e) = queue.add_root(formula.clone()) {
+                                        eprintln!("Error adding package to queue: {}", e);
+                                        std::process::exit(1);
+                                    }
+
+                                    // Add dependencies (recursively load from tap)
+                                    let mut to_load: Vec<String> = formula.dependencies.runtime.clone();
+                                    while let Some(dep_name) = to_load.pop() {
+                                        if let Ok(dep_formula) = tap_manager.find_formula(&dep_name) {
+                                            // Queue more dependencies
+                                            for subdep in &dep_formula.dependencies.runtime {
+                                                to_load.push(subdep.clone());
+                                            }
+                                            let _ = queue.add_dependency(dep_formula);
+                                        }
+                                    }
+
+                                    if dry_run {
+                                        // Show dry-run summary
+                                        match queue.dry_run_summary() {
+                                            Ok(summary) => {
+                                                print!("{}", summary);
+                                            }
+                                            Err(e) => {
+                                                eprintln!("Error resolving dependencies: {}", e);
+                                                std::process::exit(1);
+                                            }
+                                        }
+                                    } else {
+                                        // Resolve and show what would be installed
+                                        match queue.resolve() {
+                                            Ok(items) => {
+                                                if items.is_empty() {
+                                                    println!("{} is already installed", package);
+                                                } else {
+                                                    println!("Would install {} package(s):", items.len());
+                                                    for item in items {
+                                                        println!("  {} {}", item.formula.name(), item.formula.version());
+                                                    }
+                                                    println!("\n(Actual installation not yet implemented)");
+                                                }
+                                            }
+                                            Err(e) => {
+                                                eprintln!("Error resolving dependencies: {}", e);
+                                                std::process::exit(1);
+                                            }
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    eprintln!("Formula not found: {}", e);
+                                    eprintln!("\nTo search for packages:");
+                                    eprintln!("  brew-rs search {}", package);
+                                    std::process::exit(1);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("Error initializing tap manager: {}", e);
+                            std::process::exit(1);
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error loading configuration: {}", e);
+                    std::process::exit(1);
+                }
+            }
         }
         Commands::Uninstall { package } => {
             info!("Uninstalling package: {}", package);
@@ -139,7 +239,41 @@ async fn main() -> Result<()> {
         }
         Commands::Search { query } => {
             info!("Searching for: {}", query);
-            println!("🔍 Searching for '{}' (not yet implemented)", query);
+            match brew_config::Config::load() {
+                Ok(config) => {
+                    match brew_tap::TapManager::new(config.paths) {
+                        Ok(manager) => {
+                            match manager.search_with_details(&query) {
+                                Ok(results) => {
+                                    if results.is_empty() {
+                                        println!("No formulas found matching '{}'", query);
+                                    } else {
+                                        println!("Found {} formula(s) matching '{}':", results.len(), query);
+                                        for entry in results {
+                                            println!("  {} {} ({})", entry.name, entry.version, entry.tap_name);
+                                            if !entry.description.is_empty() {
+                                                println!("    {}", entry.description);
+                                            }
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    eprintln!("Error searching: {}", e);
+                                    std::process::exit(1);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("Error initializing tap manager: {}", e);
+                            std::process::exit(1);
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error loading configuration: {}", e);
+                    std::process::exit(1);
+                }
+            }
         }
         Commands::Info { package } => {
             info!("Getting info for: {}", package);
@@ -147,7 +281,49 @@ async fn main() -> Result<()> {
         }
         Commands::List => {
             info!("Listing installed packages");
-            println!("📋 Installed packages (not yet implemented)");
+            match brew_config::Config::load() {
+                Ok(config) => {
+                    match brew_core::Database::open(&config.paths) {
+                        Ok(db) => {
+                            match db.packages().list_all() {
+                                Ok(packages) => {
+                                    if packages.is_empty() {
+                                        println!("No packages installed.");
+                                        println!("\nTo install a package:");
+                                        println!("  brew-rs install <package>");
+                                    } else {
+                                        println!("Installed packages ({}):", packages.len());
+                                        for pkg in packages {
+                                            let mut flags = Vec::new();
+                                            if pkg.linked { flags.push("linked"); }
+                                            if pkg.pinned { flags.push("pinned"); }
+
+                                            let tap_info = pkg.tap.as_deref().unwrap_or("local");
+                                            if flags.is_empty() {
+                                                println!("  {} {} ({})", pkg.name, pkg.version, tap_info);
+                                            } else {
+                                                println!("  {} {} ({}) [{}]", pkg.name, pkg.version, tap_info, flags.join(", "));
+                                            }
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    eprintln!("Error listing packages: {}", e);
+                                    std::process::exit(1);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("Error opening database: {}", e);
+                            std::process::exit(1);
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error loading configuration: {}", e);
+                    std::process::exit(1);
+                }
+            }
         }
         Commands::Update => {
             info!("Updating repositories");
@@ -168,14 +344,49 @@ async fn main() -> Result<()> {
                     info!("Adding tap: {} from {}", name, url);
                     match brew_config::Config::load() {
                         Ok(config) => {
-                            let mut manager = brew_tap::TapManager::new(config.paths);
-                            match manager.add_tap(&name, &url) {
-                                Ok(_) => {
-                                    println!("✓ Added tap: {}", name);
-                                    println!("  URL: {}", url);
+                            match brew_tap::TapManager::new(config.paths) {
+                                Ok(mut manager) => {
+                                    match manager.add_tap(&name, &url) {
+                                        Ok(_) => {
+                                            println!("Added tap: {}", name);
+                                            println!("  URL: {}", url);
+                                        }
+                                        Err(e) => {
+                                            eprintln!("Error adding tap: {}", e);
+                                            std::process::exit(1);
+                                        }
+                                    }
                                 }
                                 Err(e) => {
-                                    eprintln!("Error adding tap: {}", e);
+                                    eprintln!("Error initializing tap manager: {}", e);
+                                    std::process::exit(1);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("Error loading configuration: {}", e);
+                            std::process::exit(1);
+                        }
+                    }
+                }
+                TapCommands::Remove { name } => {
+                    info!("Removing tap: {}", name);
+                    match brew_config::Config::load() {
+                        Ok(config) => {
+                            match brew_tap::TapManager::new(config.paths) {
+                                Ok(mut manager) => {
+                                    match manager.remove_tap(&name) {
+                                        Ok(_) => {
+                                            println!("Removed tap: {}", name);
+                                        }
+                                        Err(e) => {
+                                            eprintln!("Error removing tap: {}", e);
+                                            std::process::exit(1);
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    eprintln!("Error initializing tap manager: {}", e);
                                     std::process::exit(1);
                                 }
                             }
@@ -189,14 +400,32 @@ async fn main() -> Result<()> {
                 TapCommands::Update { name } => {
                     match brew_config::Config::load() {
                         Ok(config) => {
-                            let _manager = brew_tap::TapManager::new(config.paths);
-                            // For now, just show a message - we need to persist taps
-                            if let Some(tap_name) = name {
-                                info!("Updating tap: {}", tap_name);
-                                println!("🔄 Updating tap {} (tap persistence not yet implemented)", tap_name);
-                            } else {
-                                info!("Updating all taps");
-                                println!("🔄 Updating all taps (tap persistence not yet implemented)");
+                            match brew_tap::TapManager::new(config.paths) {
+                                Ok(mut manager) => {
+                                    if let Some(tap_name) = name {
+                                        info!("Updating tap: {}", tap_name);
+                                        match manager.update_tap(&tap_name) {
+                                            Ok(_) => println!("Updated tap: {}", tap_name),
+                                            Err(e) => {
+                                                eprintln!("Error updating tap {}: {}", tap_name, e);
+                                                std::process::exit(1);
+                                            }
+                                        }
+                                    } else {
+                                        info!("Updating all taps");
+                                        match manager.update_all() {
+                                            Ok(_) => println!("Updated all taps"),
+                                            Err(e) => {
+                                                eprintln!("Error updating taps: {}", e);
+                                                std::process::exit(1);
+                                            }
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    eprintln!("Error initializing tap manager: {}", e);
+                                    std::process::exit(1);
+                                }
                             }
                         }
                         Err(e) => {
@@ -208,8 +437,36 @@ async fn main() -> Result<()> {
                 TapCommands::List => {
                     match brew_config::Config::load() {
                         Ok(config) => {
-                            let _manager = brew_tap::TapManager::new(config.paths);
-                            println!("📋 Installed taps (tap persistence not yet implemented)");
+                            match brew_tap::TapManager::new(config.paths) {
+                                Ok(manager) => {
+                                    let taps = manager.list_taps();
+                                    if taps.is_empty() {
+                                        println!("No taps installed.");
+                                        println!("\nTo add a tap:");
+                                        println!("  brew-rs tap add <name> <url>");
+                                    } else {
+                                        println!("Installed taps ({}):", taps.len());
+                                        for tap in taps {
+                                            println!("  {} ({})", tap.name, tap.url);
+                                            if let Some(updated) = &tap.last_updated {
+                                                println!("    Last updated: {}", updated.format("%Y-%m-%d %H:%M:%S"));
+                                            }
+                                            if let Some(commit) = &tap.commit_hash {
+                                                let short_commit = if commit.len() > 8 {
+                                                    &commit[..8]
+                                                } else {
+                                                    commit
+                                                };
+                                                println!("    Commit: {}", short_commit);
+                                            }
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    eprintln!("Error initializing tap manager: {}", e);
+                                    std::process::exit(1);
+                                }
+                            }
                         }
                         Err(e) => {
                             eprintln!("Error loading configuration: {}", e);
