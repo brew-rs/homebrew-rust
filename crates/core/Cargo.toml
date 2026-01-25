@@ -12,6 +12,7 @@ description = "Core package manager logic for brew-rs"
 brew-solver = { path = "../solver" }
 brew-fetcher = { path = "../fetcher" }
 brew-formula = { path = "../formula" }
+brew-config = { path = "../config" }
 
 tokio.workspace = true
 anyhow.workspace = true
