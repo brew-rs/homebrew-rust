@@ -35,6 +35,12 @@ pub struct Paths {
 
     /// Config file path
     pub config_file: PathBuf,
+
+    /// Taps registry file: ~/.config/brew-rs/taps.toml
+    pub taps_file: PathBuf,
+
+    /// Formula cache database: ~/.cache/brew-rs/formula_cache.db
+    pub formula_cache_file: PathBuf,
 }
 
 impl Paths {
@@ -69,6 +75,8 @@ impl Paths {
 
         let db_file = db_dir.join("packages.db");
         let config_file = config_dir.join("config.toml");
+        let taps_file = config_dir.join("taps.toml");
+        let formula_cache_file = cache_dir.join("formula_cache.db");
 
         Ok(Self {
             data_dir,
@@ -81,6 +89,8 @@ impl Paths {
             bin_dir,
             db_file,
             config_file,
+            taps_file,
+            formula_cache_file,
         })
     }
 
