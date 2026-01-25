@@ -5,11 +5,17 @@
 //! - Updating existing taps
 //! - Discovering formulas within taps
 //! - Managing multiple taps
+//! - Persisting tap configuration across sessions
+//! - Formula caching with FTS5 full-text search
 
+mod cache;
 mod manager;
+mod persistence;
 mod repository;
 
+pub use cache::{FormulaCache, FormulaCacheEntry};
 pub use manager::TapManager;
+pub use persistence::{TapEntry, TapRegistry};
 pub use repository::Tap;
 
 use anyhow::Result;
