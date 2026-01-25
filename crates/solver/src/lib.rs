@@ -2,12 +2,17 @@
 //!
 //! This crate implements dependency resolution using a SAT solver approach
 //! for maximum performance (targeting 100x+ improvement over naive backtracking).
+//!
+//! Also provides installation queue with topological sorting.
+
+pub mod queue;
 
 use anyhow::Result;
 use brew_formula::Formula;
-use semver::Version;
 use std::collections::HashMap;
 use tracing::debug;
+
+pub use queue::{DryRunEntry, DryRunSummary, InstallQueue, QueueError, QueueItem};
 
 /// Dependency resolver
 pub struct Resolver {
