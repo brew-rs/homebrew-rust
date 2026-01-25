@@ -137,6 +137,34 @@ impl Tap {
         Formula::from_file(&formula_path)
             .with_context(|| format!("Failed to load formula {} from {}", name, self.name))
     }
+
+    /// Get the current HEAD commit hash
+    ///
+    /// Returns the full SHA-1 hash of the current HEAD commit,
+    /// which can be used for cache invalidation.
+    pub fn get_head_commit(&self) -> Result<String> {
+        if !self.path.exists() {
+            anyhow::bail!("Tap {} not found at {}", self.name, self.path.display());
+        }
+
+        let repo = Repository::open(&self.path)
+            .with_context(|| format!("Failed to open repository at {}", self.path.display()))?;
+
+        let head = repo.head().context("Failed to get HEAD reference")?;
+
+        let oid = head
+            .target()
+            .context("HEAD reference has no target (detached HEAD without commit?)")?;
+
+        Ok(oid.to_string())
+    }
+
+    /// Check if the tap repository exists and is valid
+    pub fn is_valid(&self) -> bool {
+        self.path.exists()
+            && self.path.join(".git").exists()
+            && Repository::open(&self.path).is_ok()
+    }
 }
 
 #[cfg(test)]
