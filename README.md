@@ -41,22 +41,26 @@ brew-rs solves these problems with:
 ### Current (v0.1.0)
 
 - ✅ Workspace architecture with modular crates
-- ✅ CLI with core commands (install, uninstall, search, etc.)
+- ✅ CLI with core commands (init, install, search, list, tap)
 - ✅ TOML-based formula format with Serde parsing
 - ✅ Parallel download engine with checksum verification
-- ✅ Package state tracking with SQLite
-- ✅ Basic dependency resolution framework
+- ✅ Package state tracking with SQLite (WAL mode, migrations)
+- ✅ Tap system with Git repository support
+- ✅ Formula cache with FTS5 full-text search
+- ✅ Install queue with topological dependency sorting
+- ✅ Circular dependency detection
+- ✅ Dry-run mode for install planning
 
 ### Planned (Roadmap)
 
 - 🚧 **Phase 1** (Weeks 1-4): Foundation
-  - SAT solver integration
-  - Complete installation pipeline
-  - Build from source support
+  - ✅ Week 1: Project setup, CLI, formula parsing
+  - ✅ Week 2: Tap persistence, formula cache, database, install queue
+  - 🚧 Week 3: SAT solver integration
+  - 🚧 Week 4: Build from source support
 
 - 🚧 **Phase 2** (Weeks 5-12): Core Features
   - Binary packages (bottles)
-  - Repository system (taps)
   - Upgrade/rollback functionality
 
 - 🚧 **Phase 3** (Weeks 13-16): Security
@@ -94,8 +98,17 @@ curl -fsSL https://brew-rs.serendeep.tech/install.sh | sh
 ## Quick Start
 
 ```bash
+# Initialize brew-rs directories
+brew-rs init
+
+# Add a tap (formula repository)
+brew-rs tap add <name> <git-url>
+
 # Search for a package
-brew-rs search <package>
+brew-rs search <query>
+
+# Preview installation (dry-run)
+brew-rs install --dry-run <package>
 
 # Install a package
 brew-rs install <package>
@@ -103,14 +116,14 @@ brew-rs install <package>
 # List installed packages
 brew-rs list
 
-# Update repositories
-brew-rs update
+# List installed taps
+brew-rs tap list
 
-# Upgrade packages
-brew-rs upgrade
+# Update tap repositories
+brew-rs tap update
 
-# Get package info
-brew-rs info <package>
+# Remove a tap
+brew-rs tap remove <name>
 
 # Uninstall a package
 brew-rs uninstall <package>
@@ -124,10 +137,12 @@ brew-rs uses a modular workspace architecture:
 homebrew-rust/
 ├── crates/
 │   ├── cli/          # User-facing CLI (clap-based)
-│   ├── core/         # Core package manager logic
-│   ├── solver/       # SAT-based dependency resolution
+│   ├── core/         # Core package manager logic + SQLite database
+│   ├── solver/       # Dependency resolution + install queue
 │   ├── fetcher/      # Parallel download engine (Tokio)
-│   └── formula/      # TOML formula parsing (Serde)
+│   ├── formula/      # TOML formula parsing (Serde)
+│   ├── tap/          # Tap management + formula cache (FTS5)
+│   └── config/       # Configuration + XDG paths
 ├── tests/            # Integration tests
 ├── docs/             # Documentation
 └── examples/         # Example formulae
@@ -279,7 +294,15 @@ See [ROADMAP.md](docs/ROADMAP.md) for detailed development timeline and mileston
 🚧 **Early Development** - Not yet ready for production use
 
 Current version: **0.1.0-alpha**
-Target v1.0 release: **Week 32** (see roadmap)
+Progress: **Week 2 of 32 complete** (Foundation phase)
+
+### Week 2 Completed Features
+- Tap persistence with TOML registry
+- Formula cache with SQLite FTS5 full-text search
+- Package database with migration system
+- Install queue with topological sorting
+- Circular dependency detection
+- `--dry-run` mode for install planning
 
 ---
 
