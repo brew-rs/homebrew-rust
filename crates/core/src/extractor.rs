@@ -27,6 +27,7 @@ pub fn extract_tarball(archive_path: &Path, dest_dir: &Path) -> Result<()> {
         .with_context(|| format!("Cannot open archive: {}", archive_path.display()))?;
     let gz = GzDecoder::new(file);
     let mut archive = Archive::new(gz);
+    let mut deferred_hardlinks: Vec<(PathBuf, PathBuf)> = Vec::new();
 
     for entry in archive
         .entries()
@@ -63,9 +64,53 @@ pub fn extract_tarball(archive_path: &Path, dest_dir: &Path) -> Result<()> {
                 .with_context(|| format!("Failed to create dir: {}", parent.display()))?;
         }
 
-        entry
-            .unpack(&dest)
-            .with_context(|| format!("Failed to extract: {}", relative_path.display()))?;
+        if entry.header().entry_type() == EntryType::Link {
+            // Hard links store the target with the original (unstripped) prefix.
+            // Resolve it relative to dest_dir after applying the same stripping.
+            let raw_target = entry
+                .link_name()
+                .context("Failed to read hard link target")?
+                .context("Hard link entry has no target path")?
+                .into_owned();
+
+            let stripped_target = if let Some(ref pfx) = prefix {
+                match raw_target.strip_prefix(pfx) {
+                    Ok(p) => p.to_path_buf(),
+                    Err(_) => raw_target,
+                }
+            } else {
+                raw_target
+            };
+
+            let source = dest_dir.join(&stripped_target);
+            if source.exists() {
+                fs::copy(&source, &dest).with_context(|| {
+                    format!(
+                        "Failed to copy hard link: {} -> {}",
+                        source.display(),
+                        dest.display()
+                    )
+                })?;
+            } else {
+                // Target not extracted yet — defer and copy after the main loop.
+                deferred_hardlinks.push((source, dest));
+            }
+        } else {
+            entry
+                .unpack(&dest)
+                .with_context(|| format!("Failed to extract: {}", relative_path.display()))?;
+        }
+    }
+
+    // Process hard links whose targets appeared later in the archive.
+    for (source, dest) in deferred_hardlinks {
+        fs::copy(&source, &dest).with_context(|| {
+            format!(
+                "Failed to copy deferred hard link: {} -> {}",
+                source.display(),
+                dest.display()
+            )
+        })?;
     }
 
     Ok(())
@@ -194,5 +239,57 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let result = extract_tarball(&tmp.path().join("nope.tar.gz"), tmp.path());
         assert!(result.is_err(), "should fail for missing archive");
+    }
+
+    /// Build a tarball that contains a hard link with the original prefix in
+    /// its target path — this is what causes failures when prefix-stripping.
+    fn make_tarball_with_hardlink() -> Vec<u8> {
+        let buf = Vec::new();
+        let gz = GzEncoder::new(buf, Compression::default());
+        let mut tar = tar::Builder::new(gz);
+
+        // Regular file
+        let content = b"original content";
+        let mut header = tar::Header::new_gnu();
+        header.set_size(content.len() as u64);
+        header.set_mode(0o644);
+        header.set_entry_type(tar::EntryType::Regular);
+        header.set_cksum();
+        tar.append_data(&mut header, "pkg-1.0/docs/manual.yml", &content[..])
+            .unwrap();
+
+        // Hard link whose target uses the full prefixed path
+        let mut link_header = tar::Header::new_gnu();
+        link_header.set_size(0);
+        link_header.set_mode(0o644);
+        link_header.set_entry_type(tar::EntryType::Link);
+        link_header
+            .set_link_name("pkg-1.0/docs/manual.yml")
+            .unwrap();
+        link_header.set_cksum();
+        tar.append_data(&mut link_header, "pkg-1.0/docs/v1/manual.yml", &[] as &[u8])
+            .unwrap();
+
+        let gz = tar.into_inner().unwrap();
+        gz.finish().unwrap()
+    }
+
+    #[test]
+    fn test_extract_handles_hardlinks_with_prefix_stripping() {
+        let tmp = TempDir::new().unwrap();
+        let archive_path = tmp.path().join("hardlink.tar.gz");
+        let dest = tmp.path().join("out");
+
+        fs::write(&archive_path, make_tarball_with_hardlink()).unwrap();
+
+        extract_tarball(&archive_path, &dest).unwrap();
+
+        assert!(dest.join("docs/manual.yml").exists(), "original file should exist");
+        assert!(dest.join("docs/v1/manual.yml").exists(), "hard link copy should exist");
+        assert_eq!(
+            fs::read_to_string(dest.join("docs/manual.yml")).unwrap(),
+            fs::read_to_string(dest.join("docs/v1/manual.yml")).unwrap(),
+            "hard link copy must have identical content"
+        );
     }
 }

@@ -2,6 +2,64 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use tracing::{info, Level};
 
+/// Build the text output for `brew-rs info`.
+///
+/// Returns `None` when the package is not found in either taps or the database
+/// (caller should print an error and exit 1).
+/// Returns `Some(text)` with the formatted info block otherwise.
+fn build_info_text(
+    tap_formula: Option<&brew_formula::Formula>,
+    installed: Option<&brew_core::InstalledPackage>,
+) -> Option<String> {
+    match (tap_formula, installed) {
+        (None, None) => None,
+        _ => {
+            let mut lines: Vec<String> = Vec::new();
+
+            // Formula metadata from tap
+            if let Some(f) = tap_formula {
+                lines.push(format!("{}: {}", f.name(), f.package.description));
+                lines.push(format!("Version:  {}", f.version()));
+                if let Some(hp) = &f.package.homepage {
+                    lines.push(format!("Homepage: {}", hp));
+                }
+                if let Some(lic) = &f.package.license {
+                    lines.push(format!("License:  {}", lic));
+                }
+                lines.push(format!("Source:   {}", f.source.url));
+                if !f.dependencies.runtime.is_empty() {
+                    let deps: Vec<String> = f
+                        .dependencies
+                        .runtime
+                        .iter()
+                        .map(|d| d.to_string())
+                        .collect();
+                    lines.push(format!("Deps:     {}", deps.join(", ")));
+                }
+            }
+
+            // Install status
+            if let Some(pkg) = installed {
+                lines.push(format!(
+                    "Installed: {} ({})",
+                    pkg.version,
+                    pkg.cellar_path.display()
+                ));
+                let linked_str = if pkg.linked { "linked" } else { "not linked" };
+                lines.push(format!("Status:    {}", linked_str));
+                let ts = chrono::DateTime::from_timestamp(pkg.installed_at, 0)
+                    .map(|dt: chrono::DateTime<chrono::Utc>| dt.format("%Y-%m-%d").to_string())
+                    .unwrap_or_else(|| "unknown".to_string());
+                lines.push(format!("Date:      {}", ts));
+            } else {
+                lines.push("Not installed".to_string());
+            }
+
+            Some(lines.join("\n"))
+        }
+    }
+}
+
 #[derive(Parser)]
 #[command(name = "brew-rs")]
 #[command(version, about = "A blazing-fast package manager written in Rust", long_about = None)]
@@ -30,6 +88,9 @@ enum Commands {
     Uninstall {
         /// Package name to uninstall
         package: String,
+        /// Remove even if other packages depend on it
+        #[arg(long)]
+        force: bool,
     },
     /// Search for packages
     Search {
@@ -365,9 +426,37 @@ async fn main() -> Result<()> {
                 }
             }
         }
-        Commands::Uninstall { package } => {
+        Commands::Uninstall { package, force } => {
             info!("Uninstalling package: {}", package);
-            println!("🗑️  Uninstalling {} (not yet implemented)", package);
+            match brew_config::Config::load() {
+                Ok(config) => {
+                    match brew_core::Database::open(&config.paths) {
+                        Ok(db) => {
+                            match brew_core::uninstaller::uninstall(&db, &config.paths, &package, force) {
+                                Ok(version) => {
+                                    println!("Uninstalled {} {}", package, version);
+                                }
+                                Err(e) => {
+                                    let msg = e.to_string();
+                                    eprintln!("Error: {}", msg);
+                                    if msg.contains("required by") && !force {
+                                        eprintln!("Use --force to uninstall anyway.");
+                                    }
+                                    std::process::exit(1);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("Error opening database: {}", e);
+                            std::process::exit(1);
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error loading configuration: {}", e);
+                    std::process::exit(1);
+                }
+            }
         }
         Commands::Search { query } => {
             info!("Searching for: {}", query);
@@ -409,7 +498,39 @@ async fn main() -> Result<()> {
         }
         Commands::Info { package } => {
             info!("Getting info for: {}", package);
-            println!("ℹ️  Info for {} (not yet implemented)", package);
+            match brew_config::Config::load() {
+                Ok(config) => {
+                    let tap_formula = match brew_tap::TapManager::new(config.paths.clone()) {
+                        Ok(mgr) => mgr.find_formula(&package).ok(),
+                        Err(e) => {
+                            tracing::warn!("Failed to initialize tap manager: {}", e);
+                            None
+                        }
+                    };
+
+                    let installed = match brew_core::Database::open(&config.paths) {
+                        Ok(db) => db.packages().find_by_name(&package).ok().flatten(),
+                        Err(e) => {
+                            tracing::warn!("Failed to open database: {}", e);
+                            None
+                        }
+                    };
+
+                    match build_info_text(tap_formula.as_ref(), installed.as_ref()) {
+                        None => {
+                            eprintln!("Error: {} not found in any tap or installed packages", package);
+                            std::process::exit(1);
+                        }
+                        Some(text) => {
+                            println!("{}", text);
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error loading configuration: {}", e);
+                    std::process::exit(1);
+                }
+            }
         }
         Commands::List => {
             info!("Listing installed packages");
@@ -611,4 +732,81 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use brew_core::InstalledPackage;
+    use std::path::PathBuf;
+
+    fn make_test_formula(name: &str, version: &str) -> brew_formula::Formula {
+        brew_formula::Formula::from_str(&format!(
+            "[package]\nname = \"{name}\"\nversion = \"{version}\"\ndescription = \"Test {name}\"\n\
+             [source]\nurl = \"https://example.com/{name}-{version}.tar.gz\"\n\
+             sha256 = \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\n"
+        ))
+        .expect("test formula should be valid")
+    }
+
+    fn make_test_installed(name: &str, version: &str) -> InstalledPackage {
+        InstalledPackage::new(
+            name.to_string(),
+            version.to_string(),
+            PathBuf::from(format!("/tmp/cellar/{}/{}", name, version)),
+        )
+    }
+
+    #[test]
+    fn test_info_neither_returns_none() {
+        assert!(build_info_text(None, None).is_none());
+    }
+
+    #[test]
+    fn test_info_formula_only_shows_metadata_and_not_installed() {
+        let f = make_test_formula("jq", "1.8.1");
+        let output = build_info_text(Some(&f), None).unwrap();
+        assert!(output.contains("jq"), "should include package name");
+        assert!(output.contains("1.8.1"), "should include version");
+        assert!(
+            output.contains("Not installed"),
+            "should say Not installed when package is absent from DB"
+        );
+    }
+
+    #[test]
+    fn test_info_installed_only_shows_install_status() {
+        let pkg = make_test_installed("jq", "1.8.1");
+        let output = build_info_text(None, Some(&pkg)).unwrap();
+        assert!(output.contains("1.8.1"), "should include installed version");
+        assert!(
+            !output.contains("Not installed"),
+            "should NOT say Not installed when package is present in DB"
+        );
+        assert!(
+            output.contains("Installed:"),
+            "should include Installed label"
+        );
+    }
+
+    #[test]
+    fn test_info_both_shows_formula_and_install_status() {
+        let f = make_test_formula("curl", "8.12.1");
+        let pkg = make_test_installed("curl", "8.12.1");
+        let output = build_info_text(Some(&f), Some(&pkg)).unwrap();
+        assert!(output.contains("curl"), "should include package name");
+        assert!(output.contains("8.12.1"), "should include version");
+        assert!(
+            !output.contains("Not installed"),
+            "should NOT say Not installed when package is installed"
+        );
+        assert!(
+            output.contains("Installed:"),
+            "should include Installed label"
+        );
+        assert!(
+            output.contains("Source:"),
+            "should include source URL from tap formula"
+        );
+    }
 }

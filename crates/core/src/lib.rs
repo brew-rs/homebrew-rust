@@ -9,6 +9,7 @@ pub mod extractor;
 pub mod installer;
 pub mod linker;
 pub mod state;
+pub mod uninstaller;
 
 use anyhow::Result;
 use brew_config::Paths;
