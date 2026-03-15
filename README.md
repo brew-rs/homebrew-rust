@@ -50,13 +50,18 @@ brew-rs solves these problems with:
 - ✅ Install queue with topological dependency sorting
 - ✅ Circular dependency detection
 - ✅ Dry-run mode for install planning
+- ✅ SAT-based dependency resolution (varisat)
+- ✅ Semver version constraints (`^`, `~`, `>=`, `<=`, `=`, ranges)
+- ✅ Version conflict detection with actionable error messages
+- ✅ Property-based testing with proptest
+- ✅ Criterion benchmarks for resolver performance
 
 ### Planned (Roadmap)
 
 - 🚧 **Phase 1** (Weeks 1-4): Foundation
   - ✅ Week 1: Project setup, CLI, formula parsing
   - ✅ Week 2: Tap persistence, formula cache, database, install queue
-  - 🚧 Week 3: SAT solver integration
+  - ✅ Week 3: SAT solver dependency resolution (varisat)
   - 🚧 Week 4: Build from source support
 
 - 🚧 **Phase 2** (Weeks 5-12): Core Features
@@ -154,7 +159,7 @@ homebrew-rust/
 - **HTTP**: Reqwest (concurrent downloads)
 - **Parsing**: Serde (TOML/JSON, 300-800 MB/s)
 - **CLI**: Clap (modern argument parsing)
-- **Solver**: SAT solver (libsolv or pure Rust)
+- **Solver**: varisat (pure Rust CDCL SAT solver)
 - **Database**: SQLite (rusqlite)
 - **Security**: sha2, ring (checksums, signatures)
 
@@ -176,9 +181,9 @@ sha256 = "abc123..."
 mirrors = ["https://mirror1.com/release.tar.gz"]
 
 [dependencies]
-runtime = ["dep1", "dep2"]
-build = ["cmake", "gcc"]
-test = ["pytest"]
+runtime = ["openssl ^3.0", "zlib >=1.2.11", "libssh2"]
+build = ["cmake", "pkg-config"]
+test = ["check"]
 
 [build]
 commands = [
@@ -291,18 +296,33 @@ See [ROADMAP.md](docs/ROADMAP.md) for detailed development timeline and mileston
 
 ## Status
 
-🚧 **Early Development** - Not yet ready for production use
+**Early development** — not ready for production use.
 
 Current version: **0.1.0-alpha**
-Progress: **Week 2 of 32 complete** (Foundation phase)
+Progress: **Week 3 of 32** (Foundation phase)
 
-### Week 2 Completed Features
-- Tap persistence with TOML registry
-- Formula cache with SQLite FTS5 full-text search
-- Package database with migration system
-- Install queue with topological sorting
-- Circular dependency detection
-- `--dry-run` mode for install planning
+### What works
+
+- `brew-rs init` sets up XDG-compliant directory structure
+- `brew-rs tap add/remove/update/list` manages git-based formula repositories
+- `brew-rs search` does FTS5 full-text search across all loaded taps
+- `brew-rs install --dry-run curl` resolves the full dependency tree with version constraints:
+  ```
+  Resolved 4 package(s) for curl:
+
+    zlib 1.3.2 (satisfies >=1.2.11) (dependency)
+    openssl 3.4.4 (satisfies ^3.0) (dependency)
+    libssh2 1.11.1 (dependency)
+    curl 8.18.0
+  ```
+- 98 tests passing, including property-based fuzzing of the resolver
+
+### What doesn't work yet
+
+- Actual installation (Week 4 — build from source)
+- Uninstall, upgrade, info commands
+- Binary bottles
+- Signature verification
 
 ---
 
