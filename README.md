@@ -1,87 +1,48 @@
 # brew-rs 🦀⚡
 
-> A blazing-fast, production-ready package manager written in Rust
+A package manager written in Rust. Faster than Homebrew, with SAT-based dependency resolution.
 
 [![CI](https://github.com/brew-rs/homebrew-rust/workflows/CI/badge.svg)](https://github.com/brew-rs/homebrew-rust/actions)
 [![License](https://img.shields.io/badge/license-blue.svg)](LICENSE)
 
-## Vision
+## Why
 
-**brew-rs** is a next-generation package manager built from the ground up in Rust, designed to be **10-100x faster** than traditional package managers while maintaining production-grade security and reliability.
+Homebrew takes about a second just to print its version — that's Ruby interpreter startup. Downloads are sequential. Dependency resolution uses backtracking.
 
-### Why brew-rs?
+brew-rs is a compiled binary that starts in under 100ms, downloads packages in parallel, and resolves dependencies with a SAT solver (varisat). The trade-off is maturity: Homebrew has 15+ years of edge cases handled. brew-rs is in early development.
 
-Traditional package managers suffer from fundamental performance bottlenecks:
+## Performance targets
 
-- **Slow startup**: Interpreter overhead (~1 second just to print version)
-- **Sequential operations**: No parallelism in downloads or installations
-- **Naive algorithms**: Inefficient dependency resolution
-- **Legacy design**: Built before modern performance best practices
+| Metric                | brew-rs target | Homebrew baseline        |
+| --------------------- | -------------- | ------------------------ |
+| Command startup       | <100ms         | ~1s (Ruby interpreter)   |
+| Dependency resolution | <100ms         | Seconds (backtracking)   |
+| Parallel downloads    | 50+ concurrent | Sequential               |
+| Formula parsing       | <1ms           | ~100ms (Ruby eval)       |
+| Update operations     | <5s            | ~30-60s                  |
 
-brew-rs solves these problems with:
+## What's implemented
 
-✨ **Sub-100ms command startup** (compiled binary, zero runtime overhead)
-⚡ **Aggressive parallelism** (50+ concurrent downloads by default)
-🧠 **SAT-based dependency resolution** (100x+ faster than backtracking)
-🔒 **Security-first design** (checksums, signatures, build provenance)
-🎯 **Clean architecture** (no legacy baggage, pure Rust)
+- Modular workspace (cli, core, solver, fetcher, formula, tap, config)
+- CLI commands: init, install, search, list, tap (add/remove/update/list)
+- TOML formula format with Serde parsing and validation
+- Parallel download engine with SHA-256 checksum verification
+- SQLite package database (WAL mode, migrations)
+- Git-based tap system with FTS5 full-text search
+- Install queue with topological sort and cycle detection
+- SAT-based dependency resolution (varisat) with semver constraints
+- Version conflict detection with clear error messages
+- Property-based testing (proptest) and Criterion benchmarks
 
-## Performance Targets
+## Roadmap
 
-| Metric                | brew-rs Target | vs Traditional                |
-| --------------------- | -------------- | ----------------------------- |
-| Command startup       | <100ms         | **10x faster**                |
-| Dependency resolution | <100ms         | **100x faster**               |
-| Parallel downloads    | 50+ concurrent | **∞ faster** (was sequential) |
-| Formula parsing       | <1ms           | **1000x faster**              |
-| Update operations     | <5s            | **10x faster**                |
+- **Phase 1** (Weeks 1-4): Foundation -- Weeks 1-3 done, Week 4 (build from source) in progress
+- **Phase 2** (Weeks 5-12): Binary bottles, uninstall, upgrade, rollback
+- **Phase 3** (Weeks 13-16): GPG signatures, build provenance, CVE scanning
+- **Phase 4** (Weeks 17-24): Snapshots, multi-platform, plugins
+- **Phase 5** (Weeks 25-32): 90%+ test coverage, documentation, v1.0
 
-## Features
-
-### Current (v0.1.0)
-
-- ✅ Workspace architecture with modular crates
-- ✅ CLI with core commands (init, install, search, list, tap)
-- ✅ TOML-based formula format with Serde parsing
-- ✅ Parallel download engine with checksum verification
-- ✅ Package state tracking with SQLite (WAL mode, migrations)
-- ✅ Tap system with Git repository support
-- ✅ Formula cache with FTS5 full-text search
-- ✅ Install queue with topological dependency sorting
-- ✅ Circular dependency detection
-- ✅ Dry-run mode for install planning
-- ✅ SAT-based dependency resolution (varisat)
-- ✅ Semver version constraints (`^`, `~`, `>=`, `<=`, `=`, ranges)
-- ✅ Version conflict detection with actionable error messages
-- ✅ Property-based testing with proptest
-- ✅ Criterion benchmarks for resolver performance
-
-### Planned (Roadmap)
-
-- 🚧 **Phase 1** (Weeks 1-4): Foundation
-  - ✅ Week 1: Project setup, CLI, formula parsing
-  - ✅ Week 2: Tap persistence, formula cache, database, install queue
-  - ✅ Week 3: SAT solver dependency resolution (varisat)
-  - 🚧 Week 4: Build from source support
-
-- 🚧 **Phase 2** (Weeks 5-12): Core Features
-  - Binary packages (bottles)
-  - Upgrade/rollback functionality
-
-- 🚧 **Phase 3** (Weeks 13-16): Security
-  - GPG signature verification
-  - Build provenance attestations
-  - CVE scanning
-
-- 🚧 **Phase 4** (Weeks 17-24): Advanced
-  - Snapshot & rollback system
-  - CI/CD for bottle building
-  - Performance optimizations
-
-- 🚧 **Phase 5** (Weeks 25-32): Production
-  - Comprehensive testing (>90% coverage)
-  - Full documentation
-  - Migration tools
+See [ROADMAP.md](docs/ROADMAP.md) for the full 32-week plan.
 
 ## Installation
 
@@ -136,7 +97,7 @@ brew-rs uninstall <package>
 
 ## Architecture
 
-brew-rs uses a modular workspace architecture:
+Workspace layout:
 
 ```
 homebrew-rust/
@@ -153,19 +114,13 @@ homebrew-rust/
 └── examples/         # Example formulae
 ```
 
-### Technology Stack
+### Technology stack
 
-- **Runtime**: Tokio (async I/O, parallelism)
-- **HTTP**: Reqwest (concurrent downloads)
-- **Parsing**: Serde (TOML/JSON, 300-800 MB/s)
-- **CLI**: Clap (modern argument parsing)
-- **Solver**: varisat (pure Rust CDCL SAT solver)
-- **Database**: SQLite (rusqlite)
-- **Security**: sha2, ring (checksums, signatures)
+Tokio (async runtime), Reqwest (HTTP), Serde (TOML/JSON parsing), Clap (CLI), varisat (CDCL SAT solver), rusqlite (SQLite), sha2 + ring (checksums).
 
-## Formula Format
+## Formula format
 
-brew-rs uses a clean, declarative TOML format:
+Formulas are TOML files. See [FORMULA_SPEC.md](docs/FORMULA_SPEC.md) for the full spec. Here's a typical one:
 
 ```toml
 [package]
@@ -264,15 +219,9 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for gui
 
 ## Security
 
-Security is a top priority. brew-rs implements:
+SHA-256 checksum verification is mandatory for all downloads. GPG signatures, build provenance attestations, CVE scanning, and sandboxed builds are planned.
 
-- ✅ SHA-256 checksum verification (mandatory)
-- 🚧 GPG signature verification
-- 🚧 Build provenance attestations
-- 🚧 CVE scanning
-- 🚧 Sandboxed builds
-
-To report security vulnerabilities, please email serendeep10@gmail.com (do not use public issues).
+To report vulnerabilities, email serendeep10@gmail.com (not public issues).
 
 ## License
 
@@ -280,33 +229,18 @@ Licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
 ## Acknowledgments
 
-Inspired by:
-
-- [Homebrew](https://brew.sh/) - The original package manager for macOS
-- [Cargo](https://doc.rust-lang.org/cargo/) - Rust's excellent build system and package manager
-- [libsolv](https://github.com/openSUSE/libsolv) - State-of-the-art SAT solver
-
-Built with modern Rust ecosystem tools:
-
-- Tokio, Reqwest, Serde, Clap, and many more excellent crates
-
-## Roadmap
-
-See [ROADMAP.md](docs/ROADMAP.md) for detailed development timeline and milestones.
+Inspired by [Homebrew](https://brew.sh/), [Cargo](https://doc.rust-lang.org/cargo/), and [libsolv](https://github.com/openSUSE/libsolv).
 
 ## Status
 
-**Early development** — not ready for production use.
+Early development -- not ready for production use. Version 0.1.0-alpha, Week 3 of 32.
 
-Current version: **0.1.0-alpha**
-Progress: **Week 3 of 32** (Foundation phase)
-
-### What works
+What works:
 
 - `brew-rs init` sets up XDG-compliant directory structure
 - `brew-rs tap add/remove/update/list` manages git-based formula repositories
 - `brew-rs search` does FTS5 full-text search across all loaded taps
-- `brew-rs install --dry-run curl` resolves the full dependency tree with version constraints:
+- `brew-rs install --dry-run curl` resolves the full dependency tree:
   ```
   Resolved 4 package(s) for curl:
 
@@ -317,9 +251,9 @@ Progress: **Week 3 of 32** (Foundation phase)
   ```
 - 98 tests passing, including property-based fuzzing of the resolver
 
-### What doesn't work yet
+What doesn't work yet:
 
-- Actual installation (Week 4 — build from source)
+- Actual installation (Week 4 -- build from source)
 - Uninstall, upgrade, info commands
 - Binary bottles
 - Signature verification

@@ -1,10 +1,10 @@
 # Contributing to brew-rs
 
-Thank you for your interest in contributing to brew-rs! This document provides guidelines and instructions for contributing.
+Guidelines for contributing to brew-rs.
 
 ## Code of Conduct
 
-Be respectful, inclusive, and professional. We're all here to build something great together.
+Be respectful, inclusive, and professional.
 
 ## Getting Started
 
@@ -209,4 +209,4 @@ By contributing, you agree that your contributions will be licensed under the MI
 - Join our community chat (coming soon)
 - Check existing issues and documentation
 
-Thank you for contributing to brew-rs!
+Happy hacking.

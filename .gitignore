@@ -36,3 +36,5 @@ build/
 
 # Documentation
 /docs/_build/
+docs/SAT_SOLVER_RESEARCH.md
+docs/plans/

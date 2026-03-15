@@ -2,12 +2,7 @@
 
 ## Overview
 
-brew-rs uses a declarative TOML-based formula format for package definitions. This format is designed to be:
-
-- **Human-readable**: Easy to write and understand
-- **Fast to parse**: Leverages Serde's performance (300-800 MB/s)
-- **Type-safe**: Validates at parse time
-- **Extensible**: Easy to add new fields
+Formulas are TOML files that describe how to download, build, and install a package. They are parsed with Serde, validated at parse time, and extended by adding new TOML fields.
 
 ## Basic Structure
 
