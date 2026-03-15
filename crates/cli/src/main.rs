@@ -139,52 +139,136 @@ async fn main() -> Result<()> {
             info!("Installing package: {}", package);
             match brew_config::Config::load() {
                 Ok(config) => {
-                    // Load tap manager to find formula
                     match brew_tap::TapManager::new(config.paths.clone()) {
                         Ok(tap_manager) => {
-                            // Find the formula
                             match tap_manager.find_formula(&package) {
                                 Ok(formula) => {
-                                    // Create install queue
+                                    // ── 1. Recursively collect all dep formulas ──────────
+                                    let mut all_formulas: Vec<brew_formula::Formula> =
+                                        vec![formula.clone()];
+                                    let mut visited: std::collections::HashSet<String> =
+                                        std::collections::HashSet::new();
+                                    visited.insert(formula.name().to_string());
+                                    let mut to_load: Vec<String> = formula
+                                        .dependencies
+                                        .runtime
+                                        .iter()
+                                        .map(|d| d.name.clone())
+                                        .collect();
+                                    while let Some(dep_name) = to_load.pop() {
+                                        if !visited.insert(dep_name.clone()) {
+                                            continue; // already processed — skip to prevent infinite loop
+                                        }
+                                        if let Ok(dep_formula) =
+                                            tap_manager.find_formula(&dep_name)
+                                        {
+                                            for subdep in &dep_formula.dependencies.runtime {
+                                                to_load.push(subdep.name.clone());
+                                            }
+                                            all_formulas.push(dep_formula);
+                                        }
+                                    }
+
+                                    // ── 2. SAT-resolve version constraints ───────────────
+                                    let mut resolver = brew_solver::Resolver::new();
+                                    for f in &all_formulas {
+                                        resolver.add_formula(f.clone());
+                                    }
+
+                                    let resolved = match resolver.resolve(&package) {
+                                        Ok(r) => r,
+                                        Err(e) => {
+                                            eprintln!("Dependency resolution failed: {}", e);
+                                            std::process::exit(1);
+                                        }
+                                    };
+
+                                    // ── 3. Build ordered install queue ───────────────────
                                     let mut queue = brew_solver::InstallQueue::new();
 
-                                    // Get installed packages
                                     let installed = match brew_core::Database::open(&config.paths) {
-                                        Ok(db) => {
-                                            db.packages()
-                                                .list_all()
-                                                .unwrap_or_default()
-                                                .into_iter()
-                                                .map(|p| p.name)
-                                                .collect()
-                                        }
+                                        Ok(db) => db
+                                            .packages()
+                                            .list_all()
+                                            .unwrap_or_default()
+                                            .into_iter()
+                                            .map(|p| p.name)
+                                            .collect(),
                                         Err(_) => std::collections::HashSet::new(),
                                     };
                                     queue.set_installed(installed);
 
-                                    // Add root package
-                                    if let Err(e) = queue.add_root(formula.clone()) {
-                                        eprintln!("Error adding package to queue: {}", e);
-                                        std::process::exit(1);
-                                    }
-
-                                    // Add dependencies (recursively load from tap)
-                                    let mut to_load: Vec<String> = formula.dependencies.runtime.clone();
-                                    while let Some(dep_name) = to_load.pop() {
-                                        if let Ok(dep_formula) = tap_manager.find_formula(&dep_name) {
-                                            // Queue more dependencies
-                                            for subdep in &dep_formula.dependencies.runtime {
-                                                to_load.push(subdep.clone());
-                                            }
-                                            let _ = queue.add_dependency(dep_formula);
+                                    // Add formulas that appear in the SAT resolution
+                                    let resolved_names: std::collections::HashSet<String> =
+                                        resolved.iter().map(|(n, _)| n.clone()).collect();
+                                    for f in &all_formulas {
+                                        if !resolved_names.contains(f.name()) {
+                                            continue;
+                                        }
+                                        if f.name() == package {
+                                            let _ = queue.add_root(f.clone());
+                                        } else {
+                                            let _ = queue.add_dependency(f.clone());
                                         }
                                     }
 
+                                    // ── 4. Display results ───────────────────────────────
                                     if dry_run {
-                                        // Show dry-run summary
                                         match queue.dry_run_summary() {
                                             Ok(summary) => {
-                                                print!("{}", summary);
+                                                // Print version-pinned summary
+                                                let resolved_map: std::collections::HashMap<
+                                                    String,
+                                                    semver::Version,
+                                                > = resolved.into_iter().collect();
+
+                                                // Build a map from dep name → constraint string
+                                                // by scanning all formula dependency lists
+                                                let mut constraint_map: std::collections::HashMap<
+                                                    String,
+                                                    String,
+                                                > = std::collections::HashMap::new();
+                                                for f in &all_formulas {
+                                                    for dep in &f.dependencies.runtime {
+                                                        if let Some(ref req) = dep.version_req {
+                                                            constraint_map
+                                                                .entry(dep.name.clone())
+                                                                .or_insert_with(|| req.to_string());
+                                                        }
+                                                    }
+                                                }
+
+                                                println!(
+                                                    "Resolved {} package(s) for {}:\n",
+                                                    resolved_map.len(),
+                                                    package
+                                                );
+                                                for entry in &summary.to_install {
+                                                    let tag = if entry.is_dependency {
+                                                        " (dependency)"
+                                                    } else {
+                                                        ""
+                                                    };
+                                                    if resolved_map.contains_key(&entry.name) {
+                                                        let satisfies = constraint_map
+                                                            .get(&entry.name)
+                                                            .map(|c| format!(" (satisfies {})", c))
+                                                            .unwrap_or_default();
+                                                        println!(
+                                                            "  {} {}{}{}",
+                                                            entry.name,
+                                                            entry.version,
+                                                            satisfies,
+                                                            tag
+                                                        );
+                                                    } else {
+                                                        println!("  {} {}{}", entry.name, entry.version, tag);
+                                                    }
+                                                }
+                                                if !summary.already_installed.is_empty() {
+                                                    println!();
+                                                    print!("{}", summary);
+                                                }
                                             }
                                             Err(e) => {
                                                 eprintln!("Error resolving dependencies: {}", e);
@@ -192,7 +276,6 @@ async fn main() -> Result<()> {
                                             }
                                         }
                                     } else {
-                                        // Resolve and show what would be installed
                                         match queue.resolve() {
                                             Ok(items) => {
                                                 if items.is_empty() {
@@ -200,7 +283,11 @@ async fn main() -> Result<()> {
                                                 } else {
                                                     println!("Would install {} package(s):", items.len());
                                                     for item in items {
-                                                        println!("  {} {}", item.formula.name(), item.formula.version());
+                                                        println!(
+                                                            "  {} {}",
+                                                            item.formula.name(),
+                                                            item.formula.version()
+                                                        );
                                                     }
                                                     println!("\n(Actual installation not yet implemented)");
                                                 }

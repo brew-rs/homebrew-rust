@@ -1,0 +1,30 @@
+# Formula: libssh2
+# C library implementing the SSH2 protocol
+
+[package]
+name = "libssh2"
+version = "1.11.1"
+description = "C library implementing the SSH2 protocol"
+homepage = "https://libssh2.org"
+license = "BSD-3-Clause"
+
+[source]
+url = "https://github.com/libssh2/libssh2/releases/download/libssh2-1.11.1/libssh2-1.11.1.tar.gz"
+sha256 = "d9ec76cbe34db98eec3539fe2c899d26b0c837cb3eb466a56b0f109cabf658f7"
+mirrors = [
+    "https://libssh2.org/download/libssh2-1.11.1.tar.gz"
+]
+
+[dependencies]
+runtime = ["openssl"]
+build = ["cmake", "pkg-config"]
+
+[build]
+commands = [
+    "mkdir -p build && cd build && cmake .. -DCMAKE_INSTALL_PREFIX=$PREFIX -DBUILD_SHARED_LIBS=ON -DCRYPTO_BACKEND=OpenSSL -DCMAKE_PREFIX_PATH=$PREFIX",
+    "cd build && make -j$NCPU",
+    "cd build && make install"
+]
+
+[build.env]
+PKG_CONFIG_PATH = "$PREFIX/lib/pkgconfig"

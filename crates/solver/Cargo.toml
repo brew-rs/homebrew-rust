@@ -17,9 +17,12 @@ serde.workspace = true
 semver.workspace = true
 tracing.workspace = true
 
-# TODO: Evaluate libsolv bindings vs pure Rust SAT solver
-# Options: varisat, splr, or libsolv-sys
-# For now, we'll start with a simple implementation and upgrade later
+varisat.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true
+criterion = { workspace = true }
+
+[[bench]]
+name = "resolver_bench"
+harness = false

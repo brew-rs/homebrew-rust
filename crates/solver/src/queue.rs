@@ -158,8 +158,13 @@ impl InstallQueue {
             return Ok(());
         }
 
-        // Collect runtime dependencies
-        let deps: Vec<String> = formula.dependencies.runtime.clone();
+        // Collect runtime dependency names (version constraints handled by SATResolver)
+        let deps: Vec<String> = formula
+            .dependencies
+            .runtime
+            .iter()
+            .map(|d| d.name.clone())
+            .collect();
 
         // Update reverse dependencies
         for dep in &deps {

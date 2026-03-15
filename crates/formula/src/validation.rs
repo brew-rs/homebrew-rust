@@ -35,6 +35,12 @@ pub enum ValidationError {
 
     #[error("Invalid email format in maintainers: {0}")]
     InvalidEmail(String),
+
+    #[error("Invalid dependency name '{0}': must be lowercase alphanumeric and hyphens")]
+    InvalidDependencyName(String),
+
+    #[error("Invalid version constraint for dependency '{dep}': {reason}")]
+    InvalidVersionConstraint { dep: String, reason: String },
 }
 
 /// Validate a complete formula
@@ -104,9 +110,25 @@ fn validate_source(source: &crate::SourceInfo) -> Result<()> {
 }
 
 /// Validate dependencies section
-fn validate_dependencies(_deps: &crate::Dependencies) -> Result<()> {
-    // TODO: Validate dependency names and version constraints
-    // For now, just accept any strings
+fn validate_dependencies(deps: &crate::Dependencies) -> Result<()> {
+    for dep in deps.runtime.iter().chain(deps.build.iter()).chain(deps.test.iter()) {
+        // Dep name must follow same rules as package names
+        validate_package_name(&dep.name).map_err(|_| {
+            ValidationError::InvalidDependencyName(dep.name.clone())
+        })?;
+
+        // Version constraint already validated by Dependency::from_dep_str at
+        // deserialization time, but verify the stored req round-trips cleanly.
+        if let Some(ref req) = dep.version_req {
+            // Re-parse to catch any edge-cases that slipped through
+            semver::VersionReq::parse(&req.to_string()).map_err(|e| {
+                ValidationError::InvalidVersionConstraint {
+                    dep: dep.name.clone(),
+                    reason: e.to_string(),
+                }
+            })?;
+        }
+    }
     Ok(())
 }
 
@@ -253,5 +275,58 @@ mod tests {
         assert!(validate_email("notanemail").is_err());
         assert!(validate_email("missing@domain").is_err());
         assert!(validate_email("@example.com").is_err());
+    }
+
+    fn make_test_formula(runtime_deps: &[&str]) -> crate::Formula {
+        let deps_toml: String = runtime_deps
+            .iter()
+            .map(|d| format!("\"{}\"", d))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let toml = format!(
+            r#"
+            [package]
+            name = "test"
+            version = "1.0.0"
+            description = "Test package"
+
+            [source]
+            url = "https://example.com/test.tar.gz"
+            sha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+            [dependencies]
+            runtime = [{}]
+            "#,
+            deps_toml
+        );
+        crate::Formula::from_str_unchecked(&toml).unwrap()
+    }
+
+    #[test]
+    fn test_validate_dependencies_valid() {
+        let formula = make_test_formula(&["openssl ^3.0", "zlib >=1.2.11", "libssh2"]);
+        assert!(validate_formula(&formula).is_ok());
+    }
+
+    #[test]
+    fn test_validate_dependencies_invalid_name() {
+        let formula = make_test_formula(&["UPPERCASE"]);
+        let result = validate_formula(&formula);
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("Invalid dependency name"), "message was: {}", msg);
+    }
+
+    #[test]
+    fn test_validate_dependencies_invalid_name_underscore() {
+        let formula = make_test_formula(&["bad_name"]);
+        let result = validate_formula(&formula);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_dependencies_empty_is_valid() {
+        let formula = make_test_formula(&[]);
+        assert!(validate_formula(&formula).is_ok());
     }
 }

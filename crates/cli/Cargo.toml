@@ -25,6 +25,7 @@ brew-tap = { path = "../tap" }
 clap.workspace = true
 tokio.workspace = true
 anyhow.workspace = true
+semver.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 console.workspace = true

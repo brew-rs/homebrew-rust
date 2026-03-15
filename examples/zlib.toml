@@ -1,0 +1,23 @@
+# Formula: zlib
+# A massively spiffy yet delicately unobtrusive compression library
+
+[package]
+name = "zlib"
+version = "1.3.2"
+description = "General-purpose lossless data-compression library"
+homepage = "https://zlib.net"
+license = "Zlib"
+
+[source]
+url = "https://zlib.net/current/zlib-1.3.2.tar.gz"
+sha256 = "bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16"
+mirrors = [
+    "https://github.com/madler/zlib/releases/download/v1.3.2/zlib-1.3.2.tar.gz"
+]
+
+[build]
+commands = [
+    "./configure --prefix=$PREFIX",
+    "make -j$NCPU",
+    "make install"
+]
