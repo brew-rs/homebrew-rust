@@ -21,22 +21,21 @@ brew-rs is a compiled binary that starts in under 100ms, downloads packages in p
 | Formula parsing       | <1ms           | ~100ms (Ruby eval)       |
 | Update operations     | <5s            | ~30-60s                  |
 
-## What's implemented
+## What works
 
-- Modular workspace (cli, core, solver, fetcher, formula, tap, config)
-- CLI commands: init, install, search, list, tap (add/remove/update/list)
-- TOML formula format with Serde parsing and validation
-- Parallel download engine with SHA-256 checksum verification
-- SQLite package database (WAL mode, migrations)
+- Full build-from-source pipeline: download tarball, verify SHA-256, extract, configure/make/cmake, install to Cellar, symlink to ~/.local/bin
+- Dependencies built first in topological order from the SAT resolver output
+- Mirror fallback when primary download URL fails
+- TOML formula format with validation (name, version, URLs, checksums)
+- SAT-based dependency resolution (varisat) with semver constraints and conflict detection
+- SQLite package database (WAL mode, migrations, install history)
 - Git-based tap system with FTS5 full-text search
-- Install queue with topological sort and cycle detection
-- SAT-based dependency resolution (varisat) with semver constraints
-- Version conflict detection with clear error messages
-- Property-based testing (proptest) and Criterion benchmarks
+- CLI commands: init, install, search, list, tap (add/remove/update/list)
+- 118 tests, including property-based fuzzing of the resolver
 
 ## Roadmap
 
-- **Phase 1** (Weeks 1-4): Foundation -- Weeks 1-3 done, Week 4 (build from source) in progress
+- **Phase 1** (Weeks 1-4): Foundation -- done. `brew-rs install curl` builds from source end-to-end.
 - **Phase 2** (Weeks 5-12): Binary bottles, uninstall, upgrade, rollback
 - **Phase 3** (Weeks 13-16): GPG signatures, build provenance, CVE scanning
 - **Phase 4** (Weeks 17-24): Snapshots, multi-platform, plugins
@@ -102,21 +101,21 @@ Workspace layout:
 ```
 homebrew-rust/
 ├── crates/
-│   ├── cli/          # User-facing CLI (clap-based)
-│   ├── core/         # Core package manager logic + SQLite database
-│   ├── solver/       # Dependency resolution + install queue
-│   ├── fetcher/      # Parallel download engine (Tokio)
-│   ├── formula/      # TOML formula parsing (Serde)
-│   ├── tap/          # Tap management + formula cache (FTS5)
-│   └── config/       # Configuration + XDG paths
+│   ├── cli/          # User-facing CLI (clap)
+│   ├── core/         # Installer, builder, extractor, linker, SQLite database
+│   ├── solver/       # SAT resolver (varisat) + install queue
+│   ├── fetcher/      # HTTP downloads with SHA-256 and mirror fallback
+│   ├── formula/      # TOML formula parsing and validation
+│   ├── tap/          # Git-based taps + formula cache (FTS5)
+│   └── config/       # XDG paths and TOML settings
 ├── tests/            # Integration tests
-├── docs/             # Documentation
-└── examples/         # Example formulae
+├── docs/             # Specs and roadmap
+└── examples/         # Symlink to core tap formulas
 ```
 
-### Technology stack
+### Stack
 
-Tokio (async runtime), Reqwest (HTTP), Serde (TOML/JSON parsing), Clap (CLI), varisat (CDCL SAT solver), rusqlite (SQLite), sha2 + ring (checksums).
+Tokio (async), Reqwest (HTTP), Serde (TOML), Clap (CLI), varisat (SAT solver), rusqlite (SQLite), sha2 (checksums), flate2 + tar (extraction).
 
 ## Formula format
 
@@ -233,31 +232,23 @@ Inspired by [Homebrew](https://brew.sh/), [Cargo](https://doc.rust-lang.org/carg
 
 ## Status
 
-Early development -- not ready for production use. Version 0.1.0-alpha, Week 3 of 32.
+Early development -- not ready for production use. Phase 1 complete (Week 4 of 32).
 
-What works:
+```
+$ brew-rs install curl
+Installing zlib 1.3.2...
+  zlib 1.3.2 installed
+Installing openssl 3.4.4...
+  openssl 3.4.4 installed
+Installing libssh2 1.11.1...
+  libssh2 1.11.1 installed
+Installing curl 8.18.0...
+  curl 8.18.0 installed
 
-- `brew-rs init` sets up XDG-compliant directory structure
-- `brew-rs tap add/remove/update/list` manages git-based formula repositories
-- `brew-rs search` does FTS5 full-text search across all loaded taps
-- `brew-rs install --dry-run curl` resolves the full dependency tree:
-  ```
-  Resolved 4 package(s) for curl:
+Installed 4 package(s)
 
-    zlib 1.3.2 (satisfies >=1.2.11) (dependency)
-    openssl 3.4.4 (satisfies ^3.0) (dependency)
-    libssh2 1.11.1 (dependency)
-    curl 8.18.0
-  ```
-- 98 tests passing, including property-based fuzzing of the resolver
+$ ~/.local/bin/curl --version
+curl 8.18.0 (aarch64-apple-darwin24.6.0) libcurl/8.18.0 OpenSSL/3.4.4 zlib/1.3.2 libssh2/1.11.1
+```
 
-What doesn't work yet:
-
-- Actual installation (Week 4 -- build from source)
-- Uninstall, upgrade, info commands
-- Binary bottles
-- Signature verification
-
----
-
-**Built with ❤️ and 🦀 Rust**
+Not implemented yet: uninstall, upgrade, info, binary bottles, signature verification.

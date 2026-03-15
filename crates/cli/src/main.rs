@@ -281,15 +281,61 @@ async fn main() -> Result<()> {
                                                 if items.is_empty() {
                                                     println!("{} is already installed", package);
                                                 } else {
-                                                    println!("Would install {} package(s):", items.len());
-                                                    for item in items {
-                                                        println!(
-                                                            "  {} {}",
-                                                            item.formula.name(),
-                                                            item.formula.version()
-                                                        );
+                                                    // Run the real install pipeline
+                                                    let fetcher = match brew_fetcher::Fetcher::new() {
+                                                        Ok(f) => f,
+                                                        Err(e) => {
+                                                            eprintln!("Failed to create fetcher: {}", e);
+                                                            std::process::exit(1);
+                                                        }
+                                                    };
+                                                    let installer = brew_core::installer::Installer::new(
+                                                        config.paths.clone(),
+                                                        fetcher,
+                                                    );
+                                                    let db = match brew_core::Database::open(&config.paths) {
+                                                        Ok(d) => d,
+                                                        Err(e) => {
+                                                            eprintln!("Failed to open database: {}", e);
+                                                            std::process::exit(1);
+                                                        }
+                                                    };
+
+                                                    let mut installed_count = 0;
+                                                    for item in &items {
+                                                        let name = item.formula.name();
+                                                        let version = item.formula.version();
+
+                                                        let cellar = config.paths.package_cellar(name, version);
+                                                        if db.packages().is_installed(name).unwrap_or(false) && cellar.exists() {
+                                                            println!("{} {} already installed, skipping", name, version);
+                                                            continue;
+                                                        }
+
+                                                        println!("Installing {} {}...", name, version);
+
+                                                        match installer.install_formula(&item.formula).await {
+                                                            Ok(result) => {
+                                                                if let Err(e) = installer.record_install(&db, &item.formula, &result) {
+                                                                    eprintln!("Warning: failed to record {} in database: {}", name, e);
+                                                                }
+                                                                println!("  {} {} installed", name, version);
+                                                                installed_count += 1;
+                                                            }
+                                                            Err(e) => {
+                                                                let _ = installer.record_failure(&db, &item.formula, &e.to_string());
+                                                                eprintln!("Error installing {} {}: {:#}", name, version, e);
+                                                                std::process::exit(1);
+                                                            }
+                                                        }
                                                     }
-                                                    println!("\n(Actual installation not yet implemented)");
+
+                                                    if installed_count > 0 {
+                                                        println!("\nInstalled {} package(s)", installed_count);
+                                                        if !config.paths.is_bin_in_path() {
+                                                            println!("Note: add {} to your PATH to use installed binaries", config.paths.bin_dir.display());
+                                                        }
+                                                    }
                                                 }
                                             }
                                             Err(e) => {

@@ -1,14 +1,13 @@
-//! Core package manager functionality
+//! Core package manager logic
 //!
-//! This crate provides the core logic for package management including:
-//! - Package installation and removal
-//! - State management (tracking installed packages)
-//! - Build execution
-//! - Symlink management
-//! - Package database with migration support
+//! Handles the install pipeline (download, extract, build, link),
+//! tracks installed packages in SQLite, and manages Cellar symlinks.
 
+pub mod builder;
 pub mod database;
+pub mod extractor;
 pub mod installer;
+pub mod linker;
 pub mod state;
 
 use anyhow::Result;
@@ -18,7 +17,7 @@ use tracing::info;
 
 pub use database::{Database, InstalledPackage, PackageSummary, PackageRepository};
 
-/// Package manager core
+/// Top-level orchestrator. Owns the database and resolver.
 pub struct PackageManager {
     db: Database,
     #[allow(dead_code)]
@@ -27,7 +26,7 @@ pub struct PackageManager {
 }
 
 impl PackageManager {
-    /// Create a new package manager instance
+    /// Open the database and wire up the resolver.
     pub fn new(paths: Paths) -> Result<Self> {
         let db = Database::open(&paths)?;
         Ok(Self {

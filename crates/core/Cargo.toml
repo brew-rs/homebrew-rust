@@ -23,7 +23,9 @@ rusqlite.workspace = true
 tracing.workspace = true
 chrono.workspace = true
 sha2.workspace = true
+flate2.workspace = true
+tar.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true
-tempfile = "3.8"
+tempfile.workspace = true

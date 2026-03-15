@@ -9,7 +9,7 @@
 | 1 | Project setup, CLI skeleton, TOML formula parsing, validation | Done |
 | 2 | Tap system (git repos, TOML registry, FTS5 cache), SQLite package DB, install queue with topological sort | Done |
 | 3 | SAT solver dependency resolution (varisat), semver version constraints, conflict detection, benchmarks | Done |
-| 4 | Build from source — run configure/make/cmake, install to Cellar, symlink to bin | |
+| 4 | Build from source -- download, verify SHA-256, extract, run configure/make/cmake, install to Cellar, symlink to bin | Done |
 
 At the end of Phase 1, `brew-rs install curl` should download the source tarball, verify its SHA-256, build it, and link the binary. Dependencies get built first in topological order.
 
