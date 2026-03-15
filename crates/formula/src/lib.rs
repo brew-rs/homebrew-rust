@@ -115,6 +115,7 @@ impl Formula {
     }
 
     /// Parse a formula from a TOML string
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(contents: &str) -> Result<Self> {
         let formula: Formula = toml::from_str(contents)?;
         formula.validate()?;

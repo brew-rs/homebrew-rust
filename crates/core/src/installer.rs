@@ -11,7 +11,7 @@ impl Installer {
     }
 
     /// Install a package from a formula
-    pub async fn install(&self, formula: &Formula) -> Result<()> {
+    pub async fn install(&self, _formula: &Formula) -> Result<()> {
         // TODO: Implement installation logic
         // 1. Download source/bottle
         // 2. Verify checksum

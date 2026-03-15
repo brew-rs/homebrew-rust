@@ -19,6 +19,7 @@ impl InstallType {
         }
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
             "formula" => Some(InstallType::Formula),
@@ -47,6 +48,7 @@ impl DependencyType {
         }
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
             "runtime" => Some(DependencyType::Runtime),
@@ -81,6 +83,7 @@ impl FileType {
         }
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
             "bin" => Some(FileType::Bin),
@@ -117,6 +120,7 @@ impl InstallAction {
         }
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
             "install" => Some(InstallAction::Install),

@@ -12,7 +12,6 @@ pub use paths::Paths;
 pub use settings::Settings;
 
 use anyhow::Result;
-use std::path::PathBuf;
 
 /// Main configuration manager for brew-rs
 pub struct Config {

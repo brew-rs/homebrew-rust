@@ -1,7 +1,6 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use tracing::{info, Level};
-use tracing_subscriber;
 
 #[derive(Parser)]
 #[command(name = "brew-rs")]

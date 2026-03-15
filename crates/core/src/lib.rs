@@ -21,6 +21,7 @@ pub use database::{Database, InstalledPackage, PackageSummary, PackageRepository
 /// Package manager core
 pub struct PackageManager {
     db: Database,
+    #[allow(dead_code)]
     resolver: Resolver,
     paths: Paths,
 }

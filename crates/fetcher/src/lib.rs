@@ -7,13 +7,13 @@
 //! - Resume capability
 //! - SHA-256 checksum verification
 
-use anyhow::{Result, Context};
+use anyhow::Result;
 use reqwest::Client;
 use sha2::{Sha256, Digest};
 use std::path::Path;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
-use tracing::{info, warn};
+use tracing::info;
 
 pub struct Fetcher {
     client: Client,
@@ -22,21 +22,21 @@ pub struct Fetcher {
 
 impl Fetcher {
     /// Create a new fetcher with default concurrency (50)
-    pub fn new() -> Self {
+    pub fn new() -> Result<Self> {
         Self::with_concurrency(50)
     }
 
     /// Create a new fetcher with custom concurrency limit
-    pub fn with_concurrency(max_concurrent: usize) -> Self {
+    pub fn with_concurrency(max_concurrent: usize) -> Result<Self> {
         let client = Client::builder()
             .user_agent(concat!("brew-rs/", env!("CARGO_PKG_VERSION")))
-            .build()
-            .expect("Failed to create HTTP client");
+            .no_proxy()
+            .build()?;
 
-        Self {
+        Ok(Self {
             client,
             max_concurrent,
-        }
+        })
     }
 
     /// Download a file and verify its checksum
@@ -100,19 +100,19 @@ impl Fetcher {
     }
 }
 
-impl Default for Fetcher {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_fetcher_creation() {
-        let fetcher = Fetcher::new();
+        let fetcher = Fetcher::new().unwrap();
         assert_eq!(fetcher.max_concurrent, 50);
+    }
+
+    #[test]
+    fn test_fetcher_custom_concurrency() {
+        let fetcher = Fetcher::with_concurrency(10).unwrap();
+        assert_eq!(fetcher.max_concurrent, 10);
     }
 }

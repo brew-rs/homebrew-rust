@@ -8,7 +8,7 @@ use brew_config::Paths;
 use brew_formula::Formula;
 use std::collections::HashMap;
 use std::fs;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 /// Manages multiple taps with persistent configuration
 pub struct TapManager {
