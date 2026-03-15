@@ -1,0 +1,32 @@
+# Example formula: curl
+# A command-line tool for transferring data with URLs
+
+[package]
+name = "curl"
+version = "8.18.0"
+description = "Command-line tool for transferring data with URLs"
+homepage = "https://curl.se"
+license = "MIT"
+
+[source]
+url = "https://curl.se/download/curl-8.18.0.tar.gz"
+sha256 = "e9274a5f8ab5271c0e0e6762d2fce194d5f98acc568e4ce816845b2dcc0cf88f"
+mirrors = [
+    "https://github.com/curl/curl/releases/download/curl-8_18_0/curl-8.18.0.tar.gz"
+]
+
+[dependencies]
+runtime = ["openssl ^3.0", "zlib >=1.2.11", "libssh2"]
+build = ["pkg-config", "autoconf", "automake"]
+
+[build]
+commands = [
+    "./configure --prefix=$PREFIX --with-openssl=$CELLAR/openssl/3.4.4 --with-libssh2=$CELLAR/libssh2/1.11.1 --with-zlib=$CELLAR/zlib/1.3.2 --without-libpsl --without-brotli --without-zstd --without-nghttp2 --without-libidn2 --disable-ldap --disable-ldaps",
+    "make -j$NCPU",
+    "make install"
+]
+
+[build.env]
+PKG_CONFIG_PATH = "$CELLAR/openssl/3.4.4/lib/pkgconfig:$CELLAR/libssh2/1.11.1/lib/pkgconfig:$CELLAR/zlib/1.3.2/lib/pkgconfig"
+LDFLAGS = "-L$CELLAR/openssl/3.4.4/lib -L$CELLAR/zlib/1.3.2/lib -L$CELLAR/libssh2/1.11.1/lib -Wl,-rpath,$CELLAR/openssl/3.4.4/lib -Wl,-rpath,$CELLAR/zlib/1.3.2/lib -Wl,-rpath,$CELLAR/libssh2/1.11.1/lib"
+CPPFLAGS = "-I$CELLAR/openssl/3.4.4/include -I$CELLAR/zlib/1.3.2/include -I$CELLAR/libssh2/1.11.1/include"
